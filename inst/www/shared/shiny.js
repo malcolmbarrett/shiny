@@ -6426,12 +6426,41 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
     }
 
     $('.shiny-image-output, .shiny-plot-output, .shiny-report-theme').each(function () {
-      var id = getIdFromEl(this);
-      initialValues['.clientdata_output_' + id + '_bg'] = getComputedBgColor(this);
-      initialValues['.clientdata_output_' + id + '_fg'] = getStyle(this, "color");
-      initialValues['.clientdata_output_' + id + '_accent'] = getComputedLinkColor(this);
-      initialValues['.clientdata_output_' + id + '_font'] = getComputedFont(this);
+      var el = this,
+          id = getIdFromEl(el);
+      initialValues['.clientdata_output_' + id + '_bg'] = getComputedBgColor(el);
+      initialValues['.clientdata_output_' + id + '_fg'] = getStyle(el, "color");
+      initialValues['.clientdata_output_' + id + '_accent'] = getComputedLinkColor(el);
+      initialValues['.clientdata_output_' + id + '_font'] = getComputedFont(el); // Resend computed styles if this element's class or style changes which is
+      // especially important for invalidating getCurrentOutputInfo() when error
+      // messages modify the containers CSS in a non-welcome way.
+      // https://github.com/rstudio/shiny/issues/3196
+      //
+      // Unfortunately, won't solve getCurrentOutputInfo() not invalidating
+      // if this element's ancestors change in a meaningful way, but I don't
+      // see a reasonable way to solve that issue
+      // https://github.com/rstudio/shiny/issues/2998
+
+      var observerCallback = new Debouncer(null, function () {
+        return doSendTheme(el);
+      }, 100);
+      var observer = new MutationObserver(function () {
+        return observerCallback.normalCall();
+      });
+      var config = {
+        attributes: true,
+        attributeFilter: ['style', 'class']
+      };
+      observer.observe(this, config);
     });
+
+    function doSendTheme(el) {
+      var id = getIdFromEl(el);
+      inputs.setInput('.clientdata_output_' + id + '_bg', getComputedBgColor(el));
+      inputs.setInput('.clientdata_output_' + id + '_fg', getStyle(el, "color"));
+      inputs.setInput('.clientdata_output_' + id + '_accent', getComputedLinkColor(el));
+      inputs.setInput('.clientdata_output_' + id + '_font', getComputedFont(el));
+    }
 
     function doSendImageSize() {
       $('.shiny-image-output, .shiny-plot-output, .shiny-report-size').each(function () {
@@ -6443,11 +6472,7 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
         }
       });
       $('.shiny-image-output, .shiny-plot-output, .shiny-report-theme').each(function () {
-        var id = getIdFromEl(this);
-        inputs.setInput('.clientdata_output_' + id + '_bg', getComputedBgColor(this));
-        inputs.setInput('.clientdata_output_' + id + '_fg', getStyle(this, "color"));
-        inputs.setInput('.clientdata_output_' + id + '_accent', getComputedLinkColor(this));
-        inputs.setInput('.clientdata_output_' + id + '_font', getComputedFont(this));
+        doSendTheme(this);
       });
       $('.shiny-bound-output').each(function () {
         var $this = $(this),
